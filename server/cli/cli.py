@@ -5,10 +5,13 @@ def run_cli(server):
         parts = input(">> ").strip().split()
         if not parts:
             continue
+        
+        name = parts[0]
+        args = parts[1:]
 
-        cmd = COMMANDS.get(parts[0])
+        cmd = COMMANDS.get(name)
         if not cmd:
             print("unk command")
             continue
         
-        cmd(server, parts)  
+        cmd(server, args)  

