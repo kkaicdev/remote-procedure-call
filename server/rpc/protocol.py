@@ -1,5 +1,3 @@
-from core.dispatcher import Dispatcher
-
 def handle(dispatcher, req):
     if "method" not in req:
         raise Exception("invalid request")

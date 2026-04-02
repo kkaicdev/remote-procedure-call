@@ -1,5 +1,5 @@
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from rpc.protocol import response, process
+from .protocol import response, process
 import json
 
 class RPCHandler(BaseHTTPRequestHandler):
