@@ -52,11 +52,13 @@ class Server:
 
         self.enqueue(self.create_task(method, params))
     
-    def task_result(self, task_id, output, status="ok"):
-        self.client["results"][task_id] = {
-            "output": output,
-            "status": status
-        }
+    def task_result(self, task_id, result):
+        print(f"[RESULT] {task_id}")
 
-        print(f"[RESULT] {task_id} [{status}] -> {output}")
-        return {"status": "received"}
+        if result["status"] == "ok":
+            out = result["output"]
+            print("stdout:", out["stdout"])
+            print("stderr:", out["stderr"])
+            print("code:", out["exit_code"])
+        else:
+            print("error:", result["output"]["stderr"])
