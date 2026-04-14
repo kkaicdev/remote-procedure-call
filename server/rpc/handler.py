@@ -12,7 +12,7 @@ class RPCHandler(BaseHTTPRequestHandler):
         try:
             length = int(self.headers.get("Content-Length", 0))
             raw = self.rfile.read(length)
-            data = json.loads(raw.decode())
+            data = json.loads(raw.decode("utf-8"))
 
             res = process(self.dispatcher, data)
 
@@ -30,7 +30,7 @@ class RPCHandler(BaseHTTPRequestHandler):
             self.wfile.write(body)
 
         except Exception as e:
-            body = json.dumps(response(None, error=str(e))).encode()
+            body = json.dumps(response(None, error="internal error")).encode()
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
