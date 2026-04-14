@@ -1,37 +1,44 @@
 def handle(dispatcher, req):
-    if "method" not in req:
-        raise Exception("invalid request")
+    if not isinstance(req, dict) or req.get("jsonrpc") != "2.0":
+        raise ValueError("invalid request")
+        
+    method = req.get("method")
+    if not isinstance(method, str):
+        raise ValueError("invalid method")
 
-    return dispatcher.call(req["method"], req.get("params", []))
+    params = req.get("params")
+    if params is None:
+        params = []
+    elif not isinstance(params, (list, dict)):
+        raise ValueError("invalid params")
 
-def response(req_id, result=None, error=None):
+    return dispatcher.call(method, params)
+
+def response(req_id, *, result=None, error=None):
     base = {"jsonrpc": "2.0", "id": req_id}
 
-    if error is None:
-        return base | {"result": result}
-    
-    return base | {
-        "error": {
-            "code": -32000,
-            "message": error
+    if error is not None:
+        return base | {
+            "error": {
+                "code": -32000,
+                "message": error
+            }
         }
-    }
+
+    return base | {"result": result}
+
+def _execute(dispatcher, req):
+    req_id = req.get("id")
+
+    try:
+        result = handle(dispatcher, req)
+        return None if req_id is None else response(req_id, result=result)
+    except Exception:
+        return None if req_id is None else response(req_id, error="internal error")
 
 def process(dispatcher, data):
-    def single(req):
-        try:
-            result = handle(dispatcher, req)
-            return None if req.get("id") is None else response(req.get("id"), result=result)
-        except Exception as e:
-            return None if req.get("id") is None else response(req.get("id"), error=str(e))
-        
     if isinstance(data, list):
-        res = []
-        for r in data:
-            out = single(r)
-            if out is not None:
-                res.append(out)
+        results = [r for r in (_execute(dispatcher, req) for req in data) if r is not None]
+        return results or None
 
-        return res or None
-        
-    return single(data)
+    return _execute(dispatcher, data)
