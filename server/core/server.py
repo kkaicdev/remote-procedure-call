@@ -25,7 +25,7 @@ class Server:
             raise Exception("no client")
 
         task = self.dequeue()
-        return {"task": task} if task else {}
+        return {"task": task}
     
     def enqueue(self, task):
         if not self.client:
@@ -53,6 +53,11 @@ class Server:
         self.enqueue(self.create_task(method, params))
     
     def task_result(self, task_id, result):
+        if not self.client:
+            return
+
+        self.client["results"][task_id] = result
+        
         print(f"[RESULT] {task_id}")
 
         if result["status"] == "ok":
