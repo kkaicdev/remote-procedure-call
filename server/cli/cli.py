@@ -1,6 +1,8 @@
 from .commands import COMMANDS
 
 def run_cli(server):
+    current_client = None
+
     while True:
         try:   
             parts = input(">> ").strip().split()
@@ -15,7 +17,7 @@ def run_cli(server):
                 print("unknown command (type 'help')")
                 continue
 
-            cmd(server, args)
+            current_client = cmd(server, args, current_client)
 
         except KeyboardInterrupt:
              print("\nuse 'exit' to quit")

